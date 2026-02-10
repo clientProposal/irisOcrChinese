@@ -1,12 +1,12 @@
+
+
 require('dotenv').config();
 
 const { PDFTRON_KEY: PDFTronLicense, PWD } = process.env;
 
+
 const { PDFNet } = require('@pdftron/pdfnet-node');
 
-// This sample was prepared to demonstrate this functionality with Chinese
-// Taken from here https://docs.apryse.com/core/samples/ocrtest
-// For East Asian languages, use 1 language at a time
 
 ((exports) => {
   'use strict';
@@ -33,16 +33,53 @@ const { PDFNet } = require('@pdftron/pdfnet-node');
         const output_path = './result/';
 
         try {
-          const doc = await PDFNet.PDFDoc.createFromFilePath(input_path + 'chinese_not_searchable.pdf');
-          doc.initSecurityHandler();
+          const doc = await PDFNet.PDFDoc.createFromFilePath(input_path + 'certificate-of-registration-1.pdf');
+          doc.initSecurityHandler(PDFTronLicense);
 
           const opts = new PDFNet.OCRModule.OCROptions();
-          if(useIRIS) opts.setOCREngine('iris');
-          opts.addLang('chi_tra');
+          if (useIRIS) opts.setOCREngine('iris');
+          opts.addLang('eng');
+
+          const page = await doc.getPage(1);
+          const mediaBox = await page.getMediaBox();
+
+          const pageHeight = mediaBox.y2 - mediaBox.y1;
+          const pageWidth = mediaBox.x2 - mediaBox.x1;
+          const zoneHeight = pageHeight * (1 / 3); 
+
+          /**
+           * 
+           * To produce: certificate-of-registration-full-area.pdf
+           const bottomTwoThirdsZone = new PDFNet.Rect(
+            mediaBox.x1,               
+            mediaBox.y1,                   
+            mediaBox.x2 ,                   
+            mediaBox.y2  
+          );
+           */
+
+          const bottomTwoThirdsZone = new PDFNet.Rect(
+            mediaBox.x1 + (pageWidth * 0.12),               
+            mediaBox.y1 + zoneHeight,                   
+            mediaBox.x2 - (pageWidth * 0.12),                   
+            mediaBox.y2  
+          );
+          console.log(
+            `
+            x1 mediaBox.x1 ${mediaBox.x1 + (pageWidth * 0.12)},               
+            y1 mediaBox.y1 + zoneHeight ${mediaBox.y1 + zoneHeight},                  
+            x2 mediaBox.x2 ${mediaBox.x2 - (pageWidth * 0.12)},                 
+            y2 mediaBox.y2 ${mediaBox.y2},
+            `
+          )
+
+          opts.addTextZonesForPage([bottomTwoThirdsZone], 1);
+
+          opts.addDPI(400);
 
           await PDFNet.OCRModule.processPDF(doc, opts);
 
-          await doc.save(output_path + 'chinese_not_searchable.pdf', 0);
+          await doc.save(output_path + 'certificate-of-registration-smaller-area-only.pdf', 0);
 
         } catch (err) {
           console.log(err);
@@ -54,11 +91,9 @@ const { PDFNet } = require('@pdftron/pdfnet-node');
         console.log(err);
       }
     };
-    PDFNet.runWithCleanup(main, PDFTronLicense).catch(function(error) {
+    PDFNet.runWithCleanup(main, PDFTronLicense).catch(function (error) {
       console.log('Error: ' + JSON.stringify(error));
-    }).then(function(){ return PDFNet.shutdown(); });
+    }).then(function () { return PDFNet.shutdown(); });
   };
   exports.runOCRTest();
 })(exports);
-// eslint-disable-next-line spaced-comment
-//# sourceURL=OCRTest.js
